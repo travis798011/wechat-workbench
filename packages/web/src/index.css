@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-wechat-green: #07C160;
+  --color-wechat-bg: #EDEDED;
+  --color-sidebar: #2E2E2E;
+  --color-sidebar-hover: #3A3A3A;
+  --color-sidebar-active: #404040;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}

@@ -1,0 +1,4 @@
+node_modules/
+*.db
+bridge-go/wechat-bridge
+data/
