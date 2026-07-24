@@ -88,27 +88,33 @@ extern "C" __declspec(dllexport) void UpdateWeChatProfileCache(const char* profi
     g_bridge.UpdateProfileCacheJson(profile_json, account_wxid ? account_wxid : "");
 }
 
+#pragma optimize("", off)
+#pragma runtime_checks("s", off)
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
-    switch (reason) {
-    case DLL_PROCESS_ATTACH:
-        ::DisableThreadLibraryCalls(module);
-        ::OutputDebugStringA("[WeChatApiVs2019] DllMain attach\n");
-        ::InterlockedExchange(&g_stopping, 0);
-        ::InitializeCriticalSection(&g_lock);
-        g_lock_ready = true;
-        // 不在 WeChat 进程里启动 HTTP 服务（CRT new/delete 冲突）
-        // 桥脚本用 --no-inject 模式启动 19088
-        g_server_thread = reinterpret_cast<HANDLE>(1);
-        break;
-    case DLL_PROCESS_DETACH:
-        StopWeChatApiServer();
-        if (g_lock_ready) {
-            g_lock_ready = false;
-            ::DeleteCriticalSection(&g_lock);
+    __try {
+        switch (reason) {
+        case DLL_PROCESS_ATTACH:
+            ::DisableThreadLibraryCalls(module);
+            ::OutputDebugStringA("[WeChatApiVs2019] DllMain attach\n");
+            ::InterlockedExchange(&g_stopping, 0);
+            ::InitializeCriticalSection(&g_lock);
+            g_lock_ready = true;
+            StartWeChatApiServer();
+            break;
+        case DLL_PROCESS_DETACH:
+            StopWeChatApiServer();
+            if (g_lock_ready) {
+                g_lock_ready = false;
+                ::DeleteCriticalSection(&g_lock);
+            }
+            break;
+        default:
+            break;
         }
-        break;
-    default:
-        break;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        ::OutputDebugStringA("[WeChatApiVs2019] DllMain exception caught\n");
     }
     return TRUE;
 }
+#pragma runtime_checks("s", restore)
+#pragma optimize("", on)
