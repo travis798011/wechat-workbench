@@ -1,0 +1,9 @@
+R_DEF: Internal format may change without notice
+local
+id btnOpenAccessibility
+id tvLog
+id tvStatus
+layout activity_main
+string app_name
+style Theme.WeChatHub
+xml accessibility_config

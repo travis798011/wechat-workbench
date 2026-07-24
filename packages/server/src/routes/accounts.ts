@@ -1,8 +1,51 @@
 import type { FastifyInstance } from "fastify";
 import * as repo from "../db/repository.js";
-import * as ilink from "../ilink/client.js";
 import { accountManager } from "../ilink/manager.js";
 import type { LoginStartResponse, LoginStatusResponse } from "@workbench/shared";
+
+const API_BASE = "https://ilinkai.weixin.qq.com";
+const BOT_TYPE = "3";
+
+/** SDK stores account data in ~/.openclaw/openclaw-weixin/accounts/ */
+function sdkAccountDir(): string {
+  const dir = process.env.OPENCLAW_STATE_DIR || process.env.CLAWDBOT_STATE_DIR || require("node:path").join(require("node:os").homedir(), ".openclaw");
+  return require("node:path").join(dir, "openclaw-weixin", "accounts");
+}
+
+/** Low-level iLink API calls (SDK doesn't export these) */
+async function ilinkGenerateQR(): Promise<{ qrcode: string; qrcodeUrl: string }> {
+  const url = `${API_BASE}/ilink/bot/get_bot_qrcode?bot_type=${BOT_TYPE}`;
+  const res = await fetch(url, {
+    headers: { AuthorizationType: "ilink_bot_token", "X-WECHAT-UIN": "fixed-uin" },
+  });
+  const data = await res.json() as any;
+  return { qrcode: data.qrcode, qrcodeUrl: data.qrcode_img_content };
+}
+
+async function ilinkPollQR(qrcode: string, timeoutMs: number): Promise<{
+  status: string; accountId?: string; botToken?: string; baseUrl?: string; userId?: string;
+}> {
+  const url = `${API_BASE}/ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qrcode)}`;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: { AuthorizationType: "ilink_bot_token", "X-WECHAT-UIN": "fixed-uin" },
+      signal: controller.signal,
+    });
+    const data = await res.json() as any;
+    return {
+      status: (data.status as string) ?? "wait",
+      accountId: data.ilink_bot_id as string,
+      botToken: data.bot_token as string,
+      baseUrl: data.baseurl as string,
+      userId: data.ilink_user_id as string,
+    };
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") return { status: "wait" };
+    throw e;
+  } finally { clearTimeout(t); }
+}
 
 export async function accountRoutes(app: FastifyInstance) {
   // ---- Login flow ----
@@ -10,14 +53,14 @@ export async function accountRoutes(app: FastifyInstance) {
   /** Start QR code login for an account placeholder */
   app.post<{ Params: { id: string } }>("/api/accounts/:id/login", async (req, reply) => {
     try {
-      const result = await ilink.generateQR();
+      const result = await ilinkGenerateQR();
       // Store as pending account
       const now = Date.now();
       await repo.upsertAccount({
         id: req.params.id,
         label: req.params.id,
         botToken: "",
-        baseUrl: ilink.API_BASE,
+        baseUrl: API_BASE,
         status: "qr_pending",
         avatar: null,
         nickname: null,
@@ -77,7 +120,7 @@ export async function accountRoutes(app: FastifyInstance) {
   });
 
   app.delete<{ Params: { id: string } }>("/api/accounts/:id", async (req, reply) => {
-    accountManager.stopMonitor(req.params.id);
+    accountManager.stopBot(req.params.id);
     await repo.deleteAccount(req.params.id);
     return reply.send({ ok: true });
   });
@@ -106,45 +149,70 @@ async function pollLoginStatus(accountId: string, qrcode: string): Promise<void>
 
   while (Date.now() < deadline) {
     try {
-      const status = await ilink.pollQR(qrcode, refreshCount === 0 ? 60_000 : 35_000);
+      const status = await ilinkPollQR(qrcode, refreshCount === 0 ? 60_000 : 35_000);
 
       if (status.status === "scaned") {
         await repo.updateAccountStatus(accountId, "scanning");
       } else if (status.status === "confirmed") {
         if (!status.accountId) throw new Error("No accountId in confirmed response");
+        if (!status.botToken) throw new Error("No botToken in confirmed response");
 
-        // Use the real ilink_bot_id as the account id
-        const token = status.botToken ?? "";
-        const baseUrl = status.baseUrl ?? ilink.API_BASE;
+        const token = status.botToken;
+        const baseUrl = status.baseUrl ?? API_BASE;
         const userId = status.userId ?? "";
+        const realAccountId = status.accountId;
 
         // Delete placeholder if id differs
-        if (status.accountId !== accountId) {
+        if (realAccountId !== accountId) {
           await repo.deleteAccount(accountId);
         }
 
         const now = Date.now();
         await repo.upsertAccount({
-          id: status.accountId,
-          label: status.accountId,
+          id: realAccountId,
+          label: realAccountId,
           botToken: token,
           baseUrl,
           status: "online",
           avatar: null,
           nickname: null,
-          wechatId: userId, // store scanner's wechat user ID
+          wechatId: userId,
           createdAt: now,
           updatedAt: now,
         });
 
         // Add scanner to allowFrom whitelist
         if (userId) {
-          await repo.addAllowFrom(status.accountId, userId);
+          await repo.addAllowFrom(realAccountId, userId);
         }
 
-        // Start message monitor
-        accountManager.startMonitor(status.accountId, token);
-        return; // Done!
+        // Save to SDK's file storage so start() can find it
+        // SDK stores files at ~/.openclaw/openclaw-weixin/accounts/{normalizedId}.json
+        {
+          const fs = require("node:fs") as typeof import("fs");
+          const path = require("node:path") as typeof import("path");
+          const os = require("node:os") as typeof import("os");
+          const normalizedId = realAccountId.trim().toLowerCase().replace(/[@.]/g, "-");
+          const accountsDir = path.join(os.homedir(), ".openclaw", "openclaw-weixin", "accounts");
+          const indexDir = path.join(os.homedir(), ".openclaw", "openclaw-weixin");
+          fs.mkdirSync(accountsDir, { recursive: true });
+          fs.writeFileSync(path.join(accountsDir, `${normalizedId}.json`), JSON.stringify({
+            token, baseUrl, userId: userId || undefined,
+            savedAt: new Date().toISOString(),
+          }, null, 2), "utf-8");
+          // Append to account index (don't overwrite existing)
+          let index: string[] = [];
+          try {
+            const existing = fs.readFileSync(path.join(indexDir, "accounts.json"), "utf-8");
+            index = JSON.parse(existing);
+          } catch { /* no existing index */ }
+          if (!index.includes(normalizedId)) index.push(normalizedId);
+          fs.writeFileSync(path.join(indexDir, "accounts.json"), JSON.stringify(index, null, 2), "utf-8");
+        }
+
+        // Start bot via SDK
+        accountManager.startBot(realAccountId);
+        return;
       } else if (status.status === "expired") {
         refreshCount++;
         if (refreshCount > 3) {
@@ -152,11 +220,10 @@ async function pollLoginStatus(accountId: string, qrcode: string): Promise<void>
           return;
         }
         // Refresh QR
-        const newQr = await ilink.generateQR();
+        const newQr = await ilinkGenerateQR();
         qrcode = newQr.qrcode;
         console.log(`[Login:${accountId}] QR refreshed (${refreshCount}/3)`);
       }
-      // "wait" → keep polling
     } catch (e) {
       console.error(`[Login:${accountId}] Poll error: ${e}`);
       await new Promise((r) => setTimeout(r, 2000));

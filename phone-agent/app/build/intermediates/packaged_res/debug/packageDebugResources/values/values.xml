@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">微信Hub</string>
+    <style name="Theme.WeChatHub" parent="Theme.AppCompat.Light.NoActionBar">
+    </style>
+</resources>

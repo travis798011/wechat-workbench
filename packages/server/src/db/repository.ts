@@ -5,13 +5,23 @@
 import { getDb, saveDb } from "./index.js";
 import type { Account, Contact, Message } from "@workbench/shared";
 
+// Helper: convert snake_case keys to camelCase
+function toCamelCase(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    result[camelKey] = value;
+  }
+  return result;
+}
+
 // Helper: run query and return all rows as array
 function queryAll<T = Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
   const stmt = getDb().prepare(sql);
   stmt.bind(params);
   const rows: T[] = [];
   while (stmt.step()) {
-    rows.push(stmt.getAsObject() as unknown as T);
+    rows.push(toCamelCase(stmt.getAsObject()) as unknown as T);
   }
   stmt.free();
   return rows;
@@ -114,6 +124,23 @@ export async function listMessages(
   return queryAll<Message>(
     "SELECT * FROM messages WHERE contact_id=? ORDER BY created_at DESC LIMIT ?",
     [contactId, limit],
+  ).reverse();
+}
+
+export async function listMessagesByAccount(
+  accountId: string,
+  before?: number,
+  limit = 100,
+): Promise<Message[]> {
+  if (before) {
+    return queryAll<Message>(
+      "SELECT * FROM messages WHERE account_id=? AND id<? ORDER BY created_at DESC LIMIT ?",
+      [accountId, before, limit],
+    ).reverse();
+  }
+  return queryAll<Message>(
+    "SELECT * FROM messages WHERE account_id=? ORDER BY created_at DESC LIMIT ?",
+    [accountId, limit],
   ).reverse();
 }
 

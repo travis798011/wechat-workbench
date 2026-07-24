@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "/Users/travis/.gradle/daemon/9.6.1/com.wechathub.app-debug-31:/layout_activity_main.xml.flat",
+        "source": "/Users/travis/.gradle/daemon/9.6.1/com.wechathub.app-main-33:/layout/activity_main.xml"
+    },
+    {
+        "merged": "/Users/travis/.gradle/daemon/9.6.1/com.wechathub.app-debug-31:/xml_accessibility_config.xml.flat",
+        "source": "/Users/travis/.gradle/daemon/9.6.1/com.wechathub.app-main-33:/xml/accessibility_config.xml"
+    },
+    {
+        "merged": "com.wechathub.app-debug-31:/layout_activity_main.xml.flat",
+        "source": "com.wechathub.app-main-33:/layout/activity_main.xml"
+    }
+]

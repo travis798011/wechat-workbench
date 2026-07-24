@@ -10,7 +10,6 @@ import type { WebSocket } from "ws";
 import { bus } from "../ilink/event-bus.js";
 import { accountManager } from "../ilink/manager.js";
 import * as repo from "../db/repository.js";
-import * as ilink from "../ilink/client.js";
 import { enqueueSend } from "../routes/wcf-bridge.js";
 import type {
   WsClientMessage,
@@ -131,13 +130,15 @@ async function handleClientMessage(session: WsSession, msg: WsClientMessage): Pr
         }
 
         if (msg.msgType === "text") {
-          // iLink accounts use direct send, wcf accounts use queue
+          // iLink Bot route: use SDK Bot.sendMessage() via manager
           if (acct.botToken && acct.baseUrl) {
-            await ilink.sendMessage(acct.botToken, {
-              toUserId: msg.toUserId,
-              text: msg.content,
-              contextToken: msg.contextToken,
-            });
+            const bot = accountManager.getBot(msg.accountId);
+            if (bot) {
+              await bot.sendMessage(msg.content);
+            } else {
+              sendSafe(session.ws, { type: "error", code: "BOT_NOT_STARTED", message: "Bot not started, please re-login" });
+              return;
+            }
           } else {
             enqueueSend(msg.accountId, msg.toUserId, msg.content);
           }

@@ -19,8 +19,26 @@ CRITICAL_SECTION g_lock;
 bool g_lock_ready = false;
 volatile LONG g_stopping = 0;
 
-DWORD WINAPI ServerThread(LPVOID) {
-    ::OutputDebugStringA("[WeChatApiVs2019] ServerThread starting\n");
+DWORD WINAPI ServeForeverThread(LPVOID) {
+    if (g_server) {
+        g_server->ServeForever();
+    }
+    ::OutputDebugStringA("[WeChatApiVs2019] server done\n");
+    return 0;
+}
+}
+
+extern "C" __declspec(dllexport) BOOL StartWeChatApiServer() {
+    if (!g_lock_ready) return FALSE;
+
+    EnterCriticalSection(&g_lock);
+    if (g_server_thread) {
+        LeaveCriticalSection(&g_lock);
+        return TRUE;
+    }
+    LeaveCriticalSection(&g_lock);
+
+    ::OutputDebugStringA("[WeChatApiVs2019] starting server\n");
     g_bridge.Initialize();
 
     EnterCriticalSection(&g_lock);
@@ -29,14 +47,13 @@ DWORD WINAPI ServerThread(LPVOID) {
     LeaveCriticalSection(&g_lock);
 
     if (!ok) {
-        ::OutputDebugStringA("[WeChatApiVs2019] failed to start HTTP server\n");
-        return 1;
+        ::OutputDebugStringA("[WeChatApiVs2019] failed to start\n");
+        return TRUE;
     }
+    ::OutputDebugStringA("[WeChatApiVs2019] HTTP on :19088\n");
 
-    ::OutputDebugStringA("[WeChatApiVs2019] HTTP server started on http://127.0.0.1:19088/api/\n");
-    g_server->ServeForever();
-    ::OutputDebugStringA("[WeChatApiVs2019] HTTP server stopped\n");
-    return 0;
+    g_server_thread = ::CreateThread(nullptr, 0, ServeForeverThread, nullptr, 0, nullptr);
+    return TRUE;
 }
 
 DWORD WINAPI HookThread(LPVOID) {

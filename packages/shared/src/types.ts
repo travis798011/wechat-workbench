@@ -83,7 +83,8 @@ export interface SendMessageResponse {
 }
 
 export interface MessagesQuery {
-  contactId: string;
+  contactId?: string;
+  accountId?: string;
   before?: number;   // cursor (message id)
   limit?: number;    // default 50
 }
