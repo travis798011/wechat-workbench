@@ -19,13 +19,8 @@ CRITICAL_SECTION g_lock;
 bool g_lock_ready = false;
 volatile LONG g_stopping = 0;
 
-void Log(const char* text) {
-    ::OutputDebugStringA("[WeChatApiVs2019] ");
-    ::OutputDebugStringA(text);
-    ::OutputDebugStringA("\n");
-}
-
 DWORD WINAPI ServerThread(LPVOID) {
+    ::OutputDebugStringA("[WeChatApiVs2019] ServerThread starting\n");
     g_bridge.Initialize();
 
     EnterCriticalSection(&g_lock);
@@ -34,25 +29,25 @@ DWORD WINAPI ServerThread(LPVOID) {
     LeaveCriticalSection(&g_lock);
 
     if (!ok) {
-        Log("failed to start HTTP server on http://127.0.0.1:19088/api/");
+        ::OutputDebugStringA("[WeChatApiVs2019] failed to start HTTP server\n");
         return 1;
     }
 
-    Log("HTTP server started on http://127.0.0.1:19088/api/");
+    ::OutputDebugStringA("[WeChatApiVs2019] HTTP server started on http://127.0.0.1:19088/api/\n");
     g_server->ServeForever();
-    Log("HTTP server stopped");
+    ::OutputDebugStringA("[WeChatApiVs2019] HTTP server stopped\n");
     return 0;
 }
 
 DWORD WINAPI HookThread(LPVOID) {
     for (int i = 0; i < 120 && !::InterlockedCompareExchange(&g_stopping, 0, 0); ++i) {
         if (InstallLoginInitHook(&g_bridge, &g_callback)) {
-            Log("login init hook installed");
+            ::OutputDebugStringA("[WeChatApiVs2019] login init hook installed\n");
             return 0;
         }
         ::Sleep(500);
     }
-    Log("login init hook not installed");
+    ::OutputDebugStringA("[WeChatApiVs2019] login init hook not installed\n");
     return 1;
 }
 }
