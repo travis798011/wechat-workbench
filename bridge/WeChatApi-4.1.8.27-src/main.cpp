@@ -69,24 +69,6 @@ DWORD WINAPI HookThread(LPVOID) {
 }
 }
 
-extern "C" __declspec(dllexport) BOOL StartWeChatApiServer() {
-    if (!g_lock_ready) return FALSE;
-
-    EnterCriticalSection(&g_lock);
-    if (g_server_thread) {
-        LeaveCriticalSection(&g_lock);
-        return TRUE;
-    }
-
-    g_server_thread = ::CreateThread(nullptr, 0, ServerThread, nullptr, 0, nullptr);
-    if (!g_hook_thread) {
-        g_hook_thread = ::CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
-    }
-    BOOL ok = g_server_thread != nullptr;
-    LeaveCriticalSection(&g_lock);
-    return ok;
-}
-
 extern "C" __declspec(dllexport) void StopWeChatApiServer() {
     if (!g_lock_ready) return;
 
