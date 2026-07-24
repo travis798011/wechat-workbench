@@ -1,0 +1,33 @@
+name: Build wxhook DLL for 4.1.8.27
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract DLL source
+        run: |
+          cd bridge
+          tar -xf WeChatApi-4.1.8.27.zip
+          echo "Source files:"
+          dir /b WeChatApi-4.1.8.27\src
+
+      - name: Build DLL with MSVC
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd bridge\WeChatApi-4.1.8.27\src
+          cl /LD /Fe:wxhook-418.dll /I. /O2 /D_CRT_SECURE_NO_WARNINGS /DWIN32_LEAN_AND_MEAN /DNOMINMAX main.cpp HttpServer.cpp JsonLite.cpp LoginInitHook.cpp MessageCallback.cpp WeChatBridge.cpp httpapi.lib winhttp.lib
+          echo ---DLL created---
+          dir *.dll
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: wxhook-418-dll
+          path: bridge/WeChatApi-4.1.8.27/src/wxhook-418.dll
