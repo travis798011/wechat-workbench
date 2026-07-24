@@ -66,6 +66,7 @@ DWORD WINAPI HookThread(LPVOID) {
     ::OutputDebugStringA("[WeChatApiVs2019] login init hook not installed\n");
     return 1;
 }
+}
 
 extern "C" __declspec(dllexport) void StopWeChatApiServer() {
     if (!g_lock_ready) return;
