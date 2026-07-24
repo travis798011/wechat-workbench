@@ -37,24 +37,12 @@ extern "C" __declspec(dllexport) BOOL StartWeChatApiServer() {
     }
     LeaveCriticalSection(&g_lock);
 
-    ::OutputDebugStringA("[WeChatApiVs2019] calling Initialize...\n");
-    g_bridge.Initialize();
-    ::OutputDebugStringA("[WeChatApiVs2019] Initialize done\n");
+    // 不调用 Initialize 和 HttpServer::Start
+    // 避免在 WeChat 进程中使用 CRT new/delete 导致崩溃
+    // HTTP 服务由桥脚本在本进程加载 DLL 时启动（--no-inject）
+    ::OutputDebugStringA("[WeChatApiVs2019] injected, skipping HTTP init\n");
 
-    EnterCriticalSection(&g_lock);
-    g_server.reset(new HttpServer(g_bridge, g_callback));
-    ::OutputDebugStringA("[WeChatApiVs2019] calling HttpServer::Start...\n");
-    bool ok = g_server->Start(kDefaultPrefix);
-    ::OutputDebugStringA("[WeChatApiVs2019] HttpServer::Start done\n");
-    LeaveCriticalSection(&g_lock);
-
-    if (!ok) {
-        ::OutputDebugStringA("[WeChatApiVs2019] failed to start\n");
-        return TRUE;
-    }
-    ::OutputDebugStringA("[WeChatApiVs2019] HTTP on :19088\n");
-
-    g_server_thread = ::CreateThread(nullptr, 0, ServeForeverThread, nullptr, 0, nullptr);
+    g_server_thread = reinterpret_cast<HANDLE>(1);
     return TRUE;
 }
 
