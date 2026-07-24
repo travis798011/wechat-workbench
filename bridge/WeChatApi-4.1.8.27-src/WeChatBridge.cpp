@@ -631,7 +631,14 @@ bool EnsureTaskDispatchHook(uintptr_t base) {
         0x55, 0x41, 0x57, 0x41, 0x56, 0x41, 0x54, 0x56, 0x57, 0x53,
         0x48, 0x81, 0xEC, 0xA0, 0x03, 0x00, 0x00
     };
-    if (memcmp(target, expected, sizeof(expected)) != 0) {
+    bool match = false;
+    __try {
+        match = memcmp(target, expected, sizeof(expected)) == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        SetA8Status("target access violation; skip hook");
+        return false;
+    }
+    if (!match) {
         SetA8Status("target prologue mismatch; skip hook");
         return false;
     }
