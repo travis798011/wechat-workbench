@@ -37,12 +37,15 @@ extern "C" __declspec(dllexport) BOOL StartWeChatApiServer() {
     }
     LeaveCriticalSection(&g_lock);
 
-    ::OutputDebugStringA("[WeChatApiVs2019] starting server\n");
+    ::OutputDebugStringA("[WeChatApiVs2019] calling Initialize...\n");
     g_bridge.Initialize();
+    ::OutputDebugStringA("[WeChatApiVs2019] Initialize done\n");
 
     EnterCriticalSection(&g_lock);
     g_server.reset(new HttpServer(g_bridge, g_callback));
+    ::OutputDebugStringA("[WeChatApiVs2019] calling HttpServer::Start...\n");
     bool ok = g_server->Start(kDefaultPrefix);
+    ::OutputDebugStringA("[WeChatApiVs2019] HttpServer::Start done\n");
     LeaveCriticalSection(&g_lock);
 
     if (!ok) {
@@ -101,6 +104,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     switch (reason) {
     case DLL_PROCESS_ATTACH:
         ::DisableThreadLibraryCalls(module);
+        ::OutputDebugStringA("[WeChatApiVs2019] DllMain attach\n");
         ::InterlockedExchange(&g_stopping, 0);
         ::InitializeCriticalSection(&g_lock);
         g_lock_ready = true;
