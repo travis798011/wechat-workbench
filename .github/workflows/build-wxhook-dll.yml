@@ -17,7 +17,7 @@ jobs:
       - name: Build DLL with MSVC
         run: |
           cd bridge\WeChatApi-4.1.8.27-src
-          cl /LD /Fe:wxhook-418.dll /I. /O2 /D_CRT_SECURE_NO_WARNINGS /DWIN32_LEAN_AND_MEAN /DNOMINMAX main.cpp HttpServer.cpp JsonLite.cpp LoginInitHook.cpp MessageCallback.cpp WeChatBridge.cpp httpapi.lib winhttp.lib
+          cl /LD /Fe:wxhook-418.dll /I. /O2 /MT /D_CRT_SECURE_NO_WARNINGS /DWIN32_LEAN_AND_MEAN /DNOMINMAX main.cpp HttpServer.cpp JsonLite.cpp LoginInitHook.cpp MessageCallback.cpp WeChatBridge.cpp httpapi.lib winhttp.lib
           Write-Host "---DLL created---"
           dir *.dll
 
