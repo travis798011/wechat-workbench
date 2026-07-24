@@ -96,7 +96,9 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
         ::InterlockedExchange(&g_stopping, 0);
         ::InitializeCriticalSection(&g_lock);
         g_lock_ready = true;
-        StartWeChatApiServer();
+        // 不在 WeChat 进程里启动 HTTP 服务（CRT new/delete 冲突）
+        // 桥脚本用 --no-inject 模式启动 19088
+        g_server_thread = reinterpret_cast<HANDLE>(1);
         break;
     case DLL_PROCESS_DETACH:
         StopWeChatApiServer();
