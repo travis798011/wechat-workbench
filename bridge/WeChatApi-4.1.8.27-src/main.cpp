@@ -26,7 +26,6 @@ DWORD WINAPI ServeForeverThread(LPVOID) {
     ::OutputDebugStringA("[WeChatApiVs2019] server done\n");
     return 0;
 }
-}
 
 extern "C" __declspec(dllexport) BOOL StartWeChatApiServer() {
     if (!g_lock_ready) return FALSE;
@@ -66,7 +65,6 @@ DWORD WINAPI HookThread(LPVOID) {
     }
     ::OutputDebugStringA("[WeChatApiVs2019] login init hook not installed\n");
     return 1;
-}
 }
 
 extern "C" __declspec(dllexport) void StopWeChatApiServer() {
